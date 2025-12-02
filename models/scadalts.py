@@ -2,6 +2,7 @@ from sqlalchemy import Column, BigInteger, Integer
 from sqlalchemy.dialects.mysql import DATETIME, DOUBLE
 from database import Base
 from datetime import datetime
+import pytz
 
 
 class LatestTest(Base):
@@ -29,10 +30,14 @@ class TestInfo(Base):
     begin_of_test = Column(BigInteger)
     end_of_test = Column(BigInteger)
 
+    TZ = pytz.timezone("America/Guayaquil")
+
     @property
     def inicio_test(self):
-        return datetime.fromtimestamp(self.begin_of_test / 1000)
+        dt = datetime.utcfromtimestamp(self.begin_of_test / 1000)
+        return dt.replace(tzinfo=pytz.utc).astimezone(self.TZ)
 
     @property
     def fin_test(self):
-        return datetime.fromtimestamp(self.end_of_test / 1000)
+        dt = datetime.utcfromtimestamp(self.end_of_test / 1000)
+        return dt.replace(tzinfo=pytz.utc).astimezone(self.TZ)
