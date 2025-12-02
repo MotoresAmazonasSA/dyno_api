@@ -5,4 +5,4 @@ plotly==6.5.0
 numpy==2.3.5
 pydantic-settings==2.12.0
 pymysql==1.1.2
-Kaleido==1.2.0
+matplotlib==3.10.7
