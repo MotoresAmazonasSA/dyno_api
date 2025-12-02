@@ -1,0 +1,8 @@
+fastapi[standard]==0.123.0
+pandas==2.3.3
+sqlalchemy==2.0.44
+plotly==6.5.0
+numpy==2.3.5
+pydantic-settings==2.12.0
+pymysql==1.1.2
+Kaleido==1.2.0
