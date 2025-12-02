@@ -1,6 +1,12 @@
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.tri as tri
+
+
 from models.scadalts import TestInfo
 from sqlalchemy import text
 
@@ -74,128 +80,56 @@ class EfficiencyPlot:
         return velocidad_valid, torque_valid, eficiencia_valid
 
     def generate_contour_plot(self):
-        """Generate a contour plot using Plotly"""
         if len(self.velocidad_valid) < 3:
-            return self.generate_scatter_plot()
+            raise ValueError(f"Not enough data points, {len(self.velocidad_valid)}")
 
-        # Dynamic range
-        zmin = float(np.nanmin(self.eficiencia_valid))
-        zmax = float(np.nanmax(self.eficiencia_valid))
+        velocidad_valid = self.velocidad_valid
+        torque_valid = self.torque_valid
+        eficiencia_valid = self.eficiencia_valid
 
-        # Avoid flat scale
-        if zmin == zmax:
-            zmax = zmin + 0.01
+        # Create figure
+        fig = plt.figure(figsize=(10, 6))
+        ax = fig.add_subplot(111)
 
-        try:
-            fig = go.Figure(
-                data=go.Contour(
-                    x=self.velocidad_valid,
-                    y=self.torque_valid,
-                    z=self.eficiencia_valid,
-                    colorscale="RdYlGn",
+        # Triangulation and interpolation
+        triang = tri.Triangulation(velocidad_valid, torque_valid)
+        interpolador = tri.LinearTriInterpolator(triang, eficiencia_valid)
 
-                    # 🔥 dynamic contour range
-                    zmin=zmin,
-                    zmax=zmax,
-                    contours=dict(
-                        showlabels=True,
-                        labelfont=dict(size=10, color="white"),
-                        start=zmin,
-                        end=zmax,
-                        size=(zmax - zmin) / 10,
-                    ),
-
-                    colorbar=dict(
-                        title="Eficiencia (%)",
-                        tickformat=".2f"
-                    ),
-
-                    hovertemplate=(
-                        "Velocidad: %{x:.2f} RPM<br>"
-                        "Torque: %{y:.2f} Nm<br>"
-                        "Eficiencia: %{z:.3f}%<br>"
-                        "<extra></extra>"
-                    ),
-                )
-            )
-
-            fig.update_layout(
-                title=dict(
-                    text="Mapa de Eficiencia del Motor",
-                    x=0.5,
-                    xanchor="center",
-                ),
-                xaxis_title="Velocidad (RPM)",
-                yaxis_title="Torque (Nm)",
-                template="plotly_white",
-                width=1000,
-                height=600
-            )
-
-            return fig
-
-        except Exception as e:
-            print("Plot error:", e)
-            return self.generate_scatter_plot()
-
-    def generate_scatter_plot(self):
-        """Generate scatter plot as fallback"""
-        fig = go.Figure(
-            data=go.Scatter(
-                x=self.velocidad_valid,
-                y=self.torque_valid,
-                mode="markers",
-                marker=dict(
-                    size=8,
-                    color=self.eficiencia_valid,
-                    colorscale="RdYlGn",
-                    colorbar=dict(title="Eficiencia (%)"),
-                    showscale=True,
-                ),
-                hovertemplate=(
-                        "Velocidad: %{x:.2f} RPM<br>"
-                        + "Torque: %{y:.2f} Nm<br>"
-                        + "Eficiencia: %{marker.color:.2f}%<br>"
-                        + "<extra></extra>"
-                ),
-            )
+        X, Y = np.meshgrid(
+            np.linspace(min(velocidad_valid), max(velocidad_valid), 100),
+            np.linspace(min(torque_valid), max(torque_valid), 100)
         )
 
-        fig.update_layout(
-            title={
-                "text":"Mapa de Eficiencia del Motor (Scatter Plot)",
-                "x":0.5,
-                "xanchor":"center",
-            },
-            xaxis_title="Velocidad (RPM)",
-            yaxis_title="Torque (Nm)",
-            width=1000,
-            height=600,
-            template="plotly_white",
-            font=dict(size=12),
-        )
+        Z = interpolador(X, Y)
+
+        # Filled contour
+        contour = ax.contourf(X, Y, Z, levels=15, cmap="RdYlGn")
+
+        # Contour lines
+        lines = ax.contour(X, Y, Z, levels=15, colors="black", linewidths=0.5)
+        ax.clabel(lines, inline=True, fontsize=8, fmt="%d")
+
+        # Labels & settings exactly like your script
+        ax.set_xlabel("Velocidad (RPM)")
+        ax.set_ylabel("Torque (Nm)")
+        ax.set_title("Mapa de Eficiencia del Motor")
+        ax.grid(True)
+
+        fig.colorbar(contour).set_label("Eficiencia (%)")
+        fig.tight_layout()
 
         return fig
 
     def generate_plot_image(self, plot_type="contour"):
-        """Generate plot and return as PNG bytes"""
         if plot_type == "contour":
             fig = self.generate_contour_plot()
-        else:
-            fig = self.generate_scatter_plot()
 
-        # Convert to PNG bytes
-        image_bytes = fig.to_image(format="png", width=1000, height=600, scale=2)
-        return image_bytes
-
-    def generate_plot_html(self, plot_type="contour"):
-        """Generate plot and return as HTML string (for web embedding)"""
-        if plot_type == "contour":
-            fig = self.generate_contour_plot()
-        else:
-            fig = self.generate_scatter_plot()
-
-        return fig.to_html(include_plotlyjs="cdn", full_html=False)
+        import io
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=150)
+        plt.close(fig)
+        buf.seek(0)
+        return buf.getvalue()
 
 
 def fetch_test_info(db):
