@@ -28,50 +28,24 @@ class EfficiencyPlot:
     def data_transformation(self):
         """Transform and clean the data for plotting"""
         # Use linear interpolation for missing values
-        corriente = (
-            self.df["meta_corriente_1"]
-            .interpolate(method="linear", limit_direction="both")
-            .astype(float)
-            .to_numpy()
-        )
-        voltaje = (
-            self.df["meta_lv25p_1"]
-            .interpolate(method="linear", limit_direction="both")
-            .astype(float)
-            .to_numpy()
-        )
-        torque = (
-            self.df["meta_peso_2"]
-            .interpolate(method="linear", limit_direction="both")
-            .astype(float)
-            .to_numpy()
-        )
-        velocidad = (
-            self.df["meta_encoder"]
-            .interpolate(method="linear", limit_direction="both")
-            .astype(float)
-            .to_numpy()
-        )
+        # Asignar variables
+        corriente = self.df["meta_corriente_1"].to_numpy()
+        voltaje = self.df["meta_lv25p_1"].to_numpy()
+        torque = self.df["meta_peso_2"].to_numpy()
+        velocidad = self.df["meta_encoder"].to_numpy()
 
-        # Calculate mechanical and electrical power
+        # Calcular potencia mecánica y eléctrica
         potencia_mecanica = (2 * np.pi * velocidad * torque) / 60
         potencia_electrica = voltaje * corriente
 
-        # Avoid division by zero
-        potencia_electrica = potencia_electrica.astype(float)
+        # Evitar divisiones por cero
         potencia_electrica[potencia_electrica == 0] = np.nan
 
-        # Calculate efficiency
+        # Calcular eficiencia
         eficiencia = (potencia_mecanica / potencia_electrica) * 100
 
-        # Filter valid data
-        mask_valid = (
-                ~np.isnan(eficiencia)
-                & ~np.isinf(eficiencia)
-                & (eficiencia >= 0)
-                & (eficiencia <= 100)
-        )
-
+        # Filtrar datos válidos
+        mask_valid = ~np.isnan(eficiencia) & ~np.isinf(eficiencia)
         velocidad_valid = velocidad[mask_valid]
         torque_valid = torque[mask_valid]
         eficiencia_valid = eficiencia[mask_valid]
